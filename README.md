@@ -4,7 +4,7 @@ A party game for any number of players. Watch a muted, random clip from a
 *How It's Made* compilation and shout out what's being manufactured. First to
 guess right gets the point &mdash; first to the target score wins.
 
-**[Play it here](https://YOUR_USERNAME.github.io/thats-whats-made/)** *(update this link after GitHub Pages is enabled)*
+**[Play it here](https://ccburton11.github.io/thats-whats-made/)**
 
 ## How to play
 
