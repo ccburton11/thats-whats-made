@@ -451,15 +451,30 @@
       events: {
         onReady: onPlayerReady,
         onStateChange: onPlayerStateChange,
-        onError: onPlayerError
+        onError: onPlayerError,
+        onApiChange: onPlayerApiChange
       }
     });
+  }
+
+  // Some viewers have YouTube captions turned on at the account/browser level,
+  // which overrides the cc_load_policy:0 embed param. The only reliable fix is
+  // to actively unload the captions module through the player API — and redo it
+  // whenever the API reports a module change (YouTube can silently reload the
+  // captions module on seek/play).
+  function killCaptions() {
+    if (!ytPlayer || typeof ytPlayer.unloadModule !== "function") return;
+    try { ytPlayer.unloadModule("captions"); } catch (e) { /* ignore */ }
+  }
+  function onPlayerApiChange() {
+    killCaptions();
   }
 
   function onPlayerReady() {
     ytPlayer.mute();
     duration = ytPlayer.getDuration() || 0;
     videoError.classList.remove("show");
+    killCaptions();
     beginRound(true);
   }
 
@@ -490,6 +505,8 @@
     ytPlayer.mute();
     ytPlayer.seekTo(t, true);
     ytPlayer.playVideo();
+    killCaptions();
+    setTimeout(killCaptions, 400);
     statusPill.textContent = "MUTED";
     statusPill.classList.remove("hot");
     roundActive = true;
