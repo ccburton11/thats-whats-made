@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>That's What's Made</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #1a2232;
+    --panel-2: #222c40;
+    --accent: #ff7a1a;
+    --accent-2: #2fd4a5;
+    --text: #f2f4f8;
+    --muted: #9aa4b8;
+    --danger: #ff4d4d;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #app { min-height: 100%; display: flex; flex-direction: column; }
+  .screen { display: none; flex: 1; flex-direction: column; padding: 20px; max-width: 900px; margin: 0 auto; width: 100%; }
+  .screen.active { display: flex; }
+
+  h1.title {
+    font-size: clamp(28px, 6vw, 44px);
+    text-align: center;
+    margin: 10px 0 4px;
+    letter-spacing: -0.5px;
+  }
+  h1.title span { color: var(--accent); }
+  .subtitle { text-align: center; color: var(--muted); margin-bottom: 24px; font-size: 14px; }
+
+  .panel {
+    background: var(--panel);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  input[type="text"], input[type="number"], input[type="url"] {
+    width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid #33405a;
+    background: var(--panel-2); color: var(--text); font-size: 16px; margin-bottom: 4px;
+  }
+  input:focus { outline: 2px solid var(--accent); }
+  .hint { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+  .error-box {
+    background: rgba(255,77,77,0.12); border: 1px solid var(--danger); color: #ffb3b3;
+    padding: 10px 14px; border-radius: 10px; font-size: 14px; margin-bottom: 14px; display: none;
+  }
+  .error-box.show { display: block; }
+
+  .player-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .player-row input { margin-bottom: 0; }
+  .remove-btn {
+    background: var(--panel-2); color: var(--muted); border: 1px solid #33405a; border-radius: 10px;
+    width: 44px; font-size: 18px; cursor: pointer;
+  }
+  .remove-btn:hover { color: var(--danger); border-color: var(--danger); }
+
+  button {
+    font-family: inherit; cursor: pointer; border: none; border-radius: 12px; font-weight: 700;
+    transition: transform 0.08s ease, opacity 0.15s ease;
+  }
+  button:active { transform: scale(0.96); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .btn-primary { background: var(--accent); color: #1a1200; padding: 14px 20px; font-size: 17px; width: 100%; }
+  .btn-secondary { background: var(--panel-2); color: var(--text); padding: 10px 16px; font-size: 14px; border: 1px solid #33405a; }
+  .btn-add { background: transparent; color: var(--accent-2); border: 1px dashed var(--accent-2); padding: 10px; width: 100%; font-size: 14px; }
+
+  .points-row { display: flex; align-items: center; gap: 12px; }
+  .points-row input { width: 90px; text-align: center; }
+
+  /* --- Game screen --- */
+  .video-wrap {
+    position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000;
+    border-radius: 14px; overflow: hidden; margin-bottom: 14px;
+  }
+  #yt-player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+  .shield {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 5;
+    background: transparent; cursor: default;
+  }
+  .status-pill {
+    position: absolute; top: 10px; right: 10px; z-index: 6;
+    background: rgba(0,0,0,0.55); color: var(--text); font-size: 12px; font-weight: 700;
+    padding: 5px 10px; border-radius: 999px; pointer-events: none;
+  }
+  .status-pill.hot { background: rgba(255,122,26,0.85); color: #1a1200; }
+
+  .toolbar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .toolbar button { flex: 1; min-width: 90px; padding: 14px 10px; font-size: 15px; }
+  .btn-reveal { background: var(--accent-2); color: #04241c; }
+  .btn-skip { background: var(--panel-2); color: var(--text); border: 1px solid #33405a; }
+  .btn-next { background: var(--accent); color: #1a1200; }
+  .btn-undo { background: transparent; color: var(--muted); border: 1px solid #33405a; flex: 0 0 auto; min-width: 60px; }
+
+  .meta-row { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+  .meta-row .sound-toggle { background: transparent; color: var(--muted); border: none; font-size: 18px; padding: 4px 8px; }
+
+  .scoreboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  .player-card {
+    background: var(--panel); border-radius: 14px; padding: 16px 10px; text-align: center;
+    border: 2px solid transparent; user-select: none;
+  }
+  .player-card:not(:disabled):active { border-color: var(--accent); }
+  .player-card .name { font-size: 15px; font-weight: 700; margin-bottom: 6px; word-break: break-word; }
+  .player-card .score { font-size: 30px; font-weight: 800; color: var(--accent); }
+  .player-card.flash { animation: flash-pop 0.5s ease; }
+  @keyframes flash-pop {
+    0% { transform: scale(1); }
+    30% { transform: scale(1.08); box-shadow: 0 0 0 4px var(--accent-2); }
+    100% { transform: scale(1); }
+  }
+
+  /* --- Win screen --- */
+  .win-banner { text-align: center; margin: 10px 0 20px; }
+  .win-banner .trophy { font-size: 56px; }
+  .win-banner h2 { font-size: 28px; margin: 6px 0; }
+  .standings { list-style: none; padding: 0; margin: 0 0 20px; }
+  .standings li {
+    display: flex; justify-content: space-between; background: var(--panel);
+    padding: 12px 16px; border-radius: 10px; margin-bottom: 8px; font-size: 15px;
+  }
+  .standings li.first { border: 2px solid var(--accent); font-weight: 700; }
+  .win-actions { display: flex; gap: 10px; }
+  .win-actions button { flex: 1; padding: 14px; }
+
+  .confetti-piece {
+    position: fixed; top: -20px; width: 8px; height: 14px; z-index: 999; pointer-events: none;
+    opacity: 0.9; border-radius: 2px;
+  }
+  @keyframes confetti-fall {
+    to { transform: translateY(110vh) rotate(720deg); opacity: 0.3; }
+  }
+
+  .footer-note { text-align: center; color: var(--muted); font-size: 12px; margin-top: auto; padding: 16px 0 4px; }
+  .footer-note a { color: var(--accent-2); }
+  .subtle-warning { font-size: 11px; color: var(--muted); text-align: center; margin-top: 6px; opacity: 0; transition: opacity 0.3s; }
+  .subtle-warning.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- SETUP SCREEN -->
+  <section id="screen-setup" class="screen active">
+    <h1 class="title">That's What's <span>Made</span></h1>
+    <p class="subtitle">Watch the muted clip. Shout out what's being made. First to guess wins the point.</p>
+
+    <div class="panel">
+      <label for="video-url">YouTube clip URL</label>
+      <input type="url" id="video-url" value="https://youtu.be/5VGsMlLTJM4" autocomplete="off">
+      <div class="hint">Any "How It's Made" compilation link works &mdash; full URL or bare video ID.</div>
+      <div class="error-box" id="video-error"></div>
+    </div>
+
+    <div class="panel">
+      <label>Players</label>
+      <div id="player-rows"></div>
+      <button class="btn-add" id="add-player">+ Add player</button>
+    </div>
+
+    <div class="panel">
+      <label for="points-to-win">Points to win</label>
+      <div class="points-row">
+        <input type="number" id="points-to-win" value="10" min="1" max="99">
+        <span class="hint" style="margin:0;">first player to reach this score wins</span>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="start-btn">Start Game</button>
+    <p class="footer-note">Clips stream directly from YouTube &mdash; nothing is downloaded or re-hosted.<br>Content &copy; Science Channel / "How It's Made."</p>
+  </section>
+
+  <!-- GAME SCREEN -->
+  <section id="screen-game" class="screen">
+    <div class="meta-row">
+      <span id="round-counter">Segment 1</span>
+      <button class="sound-toggle" id="sound-toggle" title="Toggle sound effects">&#128266;</button>
+    </div>
+
+    <div class="video-wrap">
+      <div id="yt-player"></div>
+      <div class="shield" id="video-shield"></div>
+      <div class="status-pill" id="status-pill">MUTED</div>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn-undo" id="undo-btn" disabled title="Undo last point">&#8630; Undo</button>
+      <button class="btn-reveal" id="reveal-btn">Reveal Sound</button>
+      <button class="btn-skip" id="skip-btn">Skip</button>
+      <button class="btn-next" id="next-btn" style="display:none;">Next &rarr;</button>
+    </div>
+    <div class="subtle-warning" id="subtle-warning">Running low on fresh segments &mdash; reusing time ranges.</div>
+
+    <div class="scoreboard" id="scoreboard"></div>
+
+    <button class="btn-secondary" id="end-game-btn" style="margin-top:16px;">End Game</button>
+  </section>
+
+  <!-- WIN SCREEN -->
+  <section id="screen-win" class="screen">
+    <div class="win-banner">
+      <div class="trophy">&#127942;</div>
+      <h2 id="winner-name">Winner!</h2>
+    </div>
+    <ul class="standings" id="standings-list"></ul>
+    <div class="win-actions">
+      <button class="btn-primary" id="play-again-btn">Play Again</button>
+      <button class="btn-secondary" id="new-game-btn">New Game</button>
+    </div>
+  </section>
+
+</div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "thats-whats-made-state-v1";
+  var START_BUFFER = 60;      // seconds to avoid at the very start of the video
+  var END_BUFFER = 90;        // seconds to avoid at the very end of the video
+  var MIN_GAP = 400;          // seconds a new timestamp must be from every prior timestamp
+  var MAX_SEEK_ATTEMPTS = 250;
+
+  // ---------- DOM ----------
+  var screens = {
+    setup: document.getElementById("screen-setup"),
+    game: document.getElementById("screen-game"),
+    win: document.getElementById("screen-win")
+  };
+  var videoUrlInput = document.getElementById("video-url");
+  var videoError = document.getElementById("video-error");
+  var playerRows = document.getElementById("player-rows");
+  var addPlayerBtn = document.getElementById("add-player");
+  var pointsToWinInput = document.getElementById("points-to-win");
+  var startBtn = document.getElementById("start-btn");
+
+  var roundCounterEl = document.getElementById("round-counter");
+  var soundToggleBtn = document.getElementById("sound-toggle");
+  var statusPill = document.getElementById("status-pill");
+  var undoBtn = document.getElementById("undo-btn");
+  var revealBtn = document.getElementById("reveal-btn");
+  var skipBtn = document.getElementById("skip-btn");
+  var nextBtn = document.getElementById("next-btn");
+  var scoreboardEl = document.getElementById("scoreboard");
+  var endGameBtn = document.getElementById("end-game-btn");
+  var subtleWarning = document.getElementById("subtle-warning");
+
+  var winnerNameEl = document.getElementById("winner-name");
+  var standingsList = document.getElementById("standings-list");
+  var playAgainBtn = document.getElementById("play-again-btn");
+  var newGameBtn = document.getElementById("new-game-btn");
+
+  // ---------- State ----------
+  var state = {
+    videoId: null,
+    players: [],       // [{name}]
+    scores: [],         // parallel array
+    pointsToWin: 10,
+    history: [],         // used timestamps this game
+    round: 1,
+    soundOn: true,
+    status: "setup"      // setup | playing | won
+  };
+
+  var ytPlayer = null;
+  var ytApiReady = false;
+  var pendingVideoId = null;
+  var duration = 0;
+  var roundActive = false;   // true = a segment is playing and can be scored
+  var undoSnapshot = null;   // {scores, round, history} snapshot for single-level undo
+
+  // ---------- Persistence ----------
+  function saveState() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+  }
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (e) { return null; }
+  }
+  function clearState() {
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* ignore */ }
+  }
+
+  // ---------- Video ID parsing ----------
+  function extractVideoId(input) {
+    if (!input) return null;
+    input = input.trim();
+    if (/^[\w-]{11}$/.test(input)) return input;
+    try {
+      var u = new URL(input);
+      var host = u.hostname.replace("www.", "");
+      if (host === "youtu.be") {
+        var id = u.pathname.slice(1).split("/")[0];
+        if (/^[\w-]{11}$/.test(id)) return id;
+      }
+      if (host.indexOf("youtube.com") !== -1) {
+        var v = u.searchParams.get("v");
+        if (v && /^[\w-]{11}$/.test(v)) return v;
+        var m = u.pathname.match(/\/(embed|shorts|live)\/([\w-]{11})/);
+        if (m) return m[2];
+      }
+    } catch (e) { /* not a valid URL, fall through */ }
+    var m2 = input.match(/([\w-]{11})(?:[?&#].*)?$/);
+    return m2 ? m2[1] : null;
+  }
+
+  // ---------- Player rows (setup screen) ----------
+  function addPlayerRow(name) {
+    var row = document.createElement("div");
+    row.className = "player-row";
+    var input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "Player name";
+    input.value = name || "";
+    input.maxLength = 24;
+    var removeBtn = document.createElement("button");
+    removeBtn.className = "remove-btn";
+    removeBtn.textContent = "✕";
+    removeBtn.title = "Remove player";
+    removeBtn.addEventListener("click", function () {
+      if (playerRows.children.length > 1) row.remove();
+    });
+    row.appendChild(input);
+    row.appendChild(removeBtn);
+    playerRows.appendChild(row);
+  }
+  addPlayerBtn.addEventListener("click", function () { addPlayerRow(""); });
+
+  function getSetupPlayerNames() {
+    var inputs = playerRows.querySelectorAll("input");
+    var names = [];
+    inputs.forEach(function (inp, i) {
+      var v = inp.value.trim();
+      names.push(v || ("Player " + (i + 1)));
+    });
+    return names;
+  }
+
+  // ---------- Sound (tiny synth beeps, no audio files) ----------
+  var audioCtx = null;
+  function getAudioCtx() {
+    if (!audioCtx) {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (Ctx) audioCtx = new Ctx();
+    }
+    return audioCtx;
+  }
+  function beep(freq, dur, delay) {
+    if (!state.soundOn) return;
+    var ctx = getAudioCtx();
+    if (!ctx) return;
+    var startAt = ctx.currentTime + (delay || 0);
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    gain.gain.setValueAtTime(0.001, startAt);
+    gain.gain.exponentialRampToValueAtTime(0.18, startAt + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, startAt + dur);
+    osc.start(startAt);
+    osc.stop(startAt + dur + 0.02);
+  }
+  function playPointSound() { beep(660, 0.12, 0); beep(880, 0.14, 0.1); }
+  function playWinSound() { beep(523, 0.12, 0); beep(659, 0.12, 0.12); beep(784, 0.12, 0.24); beep(1046, 0.22, 0.36); }
+  function playUndoSound() { beep(300, 0.1, 0); }
+
+  function updateSoundToggleUI() {
+    soundToggleBtn.innerHTML = state.soundOn ? "&#128266;" : "&#128263;";
+    soundToggleBtn.style.opacity = state.soundOn ? "1" : "0.5";
+  }
+  soundToggleBtn.addEventListener("click", function () {
+    state.soundOn = !state.soundOn;
+    updateSoundToggleUI();
+    saveState();
+  });
+
+  // ---------- Random-seek engine ----------
+  // Picks a time uniformly within the safe range that is at least MIN_GAP seconds
+  // from every timestamp already used this game (not just the last one), so a
+  // later round can't land back inside an earlier segment. If the history is so
+  // dense no valid slot exists, the history is cleared and play continues.
+  function pickRandomTime(videoDuration, history) {
+    var minT = START_BUFFER;
+    var maxT = Math.max(minT + 1, videoDuration - END_BUFFER);
+    if (maxT <= minT) { minT = 0; maxT = videoDuration; }
+
+    var attempts = 0;
+    var candidate;
+    var ranOut = false;
+    do {
+      candidate = minT + Math.random() * (maxT - minT);
+      attempts++;
+      if (attempts >= MAX_SEEK_ATTEMPTS) { ranOut = true; break; }
+    } while (history.some(function (t) { return Math.abs(t - candidate) < MIN_GAP; }));
+
+    if (ranOut) {
+      history.length = 0;
+      candidate = minT + Math.random() * (maxT - minT);
+      showSubtleWarning();
+    }
+    history.push(candidate);
+    return candidate;
+  }
+
+  var warningTimer = null;
+  function showSubtleWarning() {
+    subtleWarning.classList.add("show");
+    clearTimeout(warningTimer);
+    warningTimer = setTimeout(function () { subtleWarning.classList.remove("show"); }, 4000);
+  }
+
+  // ---------- YouTube IFrame API ----------
+  window.onYouTubeIframeAPIReady = function () {
+    ytApiReady = true;
+    if (pendingVideoId) createPlayer(pendingVideoId);
+  };
+
+  function createPlayer(videoId) {
+    if (!ytApiReady) { pendingVideoId = videoId; return; }
+    if (ytPlayer) { ytPlayer.destroy(); ytPlayer = null; }
+    ytPlayer = new YT.Player("yt-player", {
+      videoId: videoId,
+      playerVars: {
+        autoplay: 1,
+        controls: 0,
+        disablekb: 1,
+        cc_load_policy: 0,
+        iv_load_policy: 3,
+        modestbranding: 1,
+        rel: 0,
+        fs: 0,
+        playsinline: 1,
+        mute: 1,
+        origin: window.location.origin
+      },
+      events: {
+        onReady: onPlayerReady,
+        onStateChange: onPlayerStateChange,
+        onError: onPlayerError
+      }
+    });
+  }
+
+  function onPlayerReady() {
+    ytPlayer.mute();
+    duration = ytPlayer.getDuration() || 0;
+    videoError.classList.remove("show");
+    beginRound(true);
+  }
+
+  function onPlayerError() {
+    if (state.status === "setup") {
+      showVideoError("Couldn't load that video — it may be private, deleted, or blocked from embedding. Try a different link.");
+      startBtn.disabled = false;
+    }
+  }
+
+  function onPlayerStateChange(e) {
+    // 0 = ended: the random seek landed too close to the end of the video for
+    // playback to continue a full round. Just pick a new time and keep going.
+    if (e.data === 0 && state.status === "playing") {
+      beginRound(false);
+    }
+  }
+
+  function showVideoError(msg) {
+    videoError.textContent = msg;
+    videoError.classList.add("show");
+  }
+
+  // ---------- Round flow ----------
+  function beginRound(isFirstRound) {
+    if (!duration) duration = (ytPlayer && ytPlayer.getDuration()) || 0;
+    var t = pickRandomTime(duration, state.history);
+    ytPlayer.mute();
+    ytPlayer.seekTo(t, true);
+    ytPlayer.playVideo();
+    statusPill.textContent = "MUTED";
+    statusPill.classList.remove("hot");
+    roundActive = true;
+    nextBtn.style.display = "none";
+    revealBtn.disabled = false;
+    skipBtn.disabled = false;
+    setScoreboardEnabled(true);
+    if (!isFirstRound) state.round += 1;
+    roundCounterEl.textContent = "Segment " + state.round;
+    state.status = "playing";
+    saveState();
+  }
+
+  revealBtn.addEventListener("click", function () {
+    if (!ytPlayer) return;
+    ytPlayer.unMute();
+    ytPlayer.setVolume(100);
+    statusPill.textContent = "SOUND ON";
+    statusPill.classList.add("hot");
+  });
+
+  skipBtn.addEventListener("click", function () {
+    beginRound(false);
+    undoBtn.disabled = true;
+    undoSnapshot = null;
+  });
+
+  nextBtn.addEventListener("click", function () {
+    beginRound(false);
+  });
+
+  endGameBtn.addEventListener("click", function () {
+    if (confirm("End this game and return to setup?")) {
+      clearState();
+      resetToSetup();
+    }
+  });
+
+  // ---------- Scoreboard ----------
+  function renderScoreboard() {
+    scoreboardEl.innerHTML = "";
+    state.players.forEach(function (name, i) {
+      var card = document.createElement("button");
+      card.className = "player-card";
+      card.innerHTML = '<div class="name"></div><div class="score"></div>';
+      card.querySelector(".name").textContent = name;
+      card.querySelector(".score").textContent = state.scores[i];
+      card.addEventListener("click", function () { awardPoint(i, card); });
+      scoreboardEl.appendChild(card);
+    });
+  }
+  function setScoreboardEnabled(enabled) {
+    scoreboardEl.querySelectorAll(".player-card").forEach(function (c) { c.disabled = !enabled; });
+  }
+
+  function awardPoint(i, cardEl) {
+    if (!roundActive) return;
+    undoSnapshot = { scores: state.scores.slice(), round: state.round, history: state.history.slice() };
+    undoBtn.disabled = false;
+
+    state.scores[i] += 1;
+    roundActive = false;
+    setScoreboardEnabled(false);
+    revealBtn.disabled = true;
+    skipBtn.disabled = true;
+    playPointSound();
+
+    if (cardEl) {
+      cardEl.classList.add("flash");
+      setTimeout(function () { cardEl.classList.remove("flash"); }, 500);
+      cardEl.querySelector(".score").textContent = state.scores[i];
+    }
+
+    if (state.scores[i] >= state.pointsToWin) {
+      state.status = "won";
+      saveState();
+      setTimeout(function () { showWinScreen(i); }, 450);
+      return;
+    }
+
+    nextBtn.style.display = "block";
+    saveState();
+  }
+
+  undoBtn.addEventListener("click", function () {
+    if (!undoSnapshot) return;
+    state.scores = undoSnapshot.scores.slice();
+    state.round = undoSnapshot.round;
+    state.history = undoSnapshot.history.slice();
+    undoSnapshot = null;
+    undoBtn.disabled = true;
+    playUndoSound();
+    renderScoreboard();
+    roundCounterEl.textContent = "Segment " + state.round;
+    roundActive = true;
+    setScoreboardEnabled(true);
+    revealBtn.disabled = false;
+    skipBtn.disabled = false;
+    nextBtn.style.display = "none";
+    saveState();
+  });
+
+  // ---------- Win screen ----------
+  function showWinScreen(winnerIndex) {
+    playWinSound();
+    winnerNameEl.textContent = state.players[winnerIndex] + " wins!";
+    var ranked = state.players.map(function (name, i) { return { name: name, score: state.scores[i] }; });
+    ranked.sort(function (a, b) { return b.score - a.score; });
+    standingsList.innerHTML = "";
+    ranked.forEach(function (p, idx) {
+      var li = document.createElement("li");
+      if (idx === 0) li.className = "first";
+      var nameSpan = document.createElement("span");
+      nameSpan.textContent = (idx === 0 ? "\u{1F3C6} " : "") + p.name;
+      var scoreSpan = document.createElement("span");
+      scoreSpan.textContent = p.score;
+      li.appendChild(nameSpan);
+      li.appendChild(scoreSpan);
+      standingsList.appendChild(li);
+    });
+    showScreen("win");
+    launchConfetti();
+  }
+
+  function launchConfetti() {
+    var colors = ["#ff7a1a", "#2fd4a5", "#f2f4f8", "#ffd166", "#ef476f"];
+    for (var i = 0; i < 90; i++) {
+      (function (i) {
+        var piece = document.createElement("div");
+        piece.className = "confetti-piece";
+        piece.style.left = Math.random() * 100 + "vw";
+        piece.style.background = colors[i % colors.length];
+        piece.style.animation = "confetti-fall " + (2.2 + Math.random() * 1.6) + "s ease-in forwards";
+        piece.style.animationDelay = (Math.random() * 0.6) + "s";
+        document.body.appendChild(piece);
+        setTimeout(function () { piece.remove(); }, 5000);
+      })(i);
+    }
+  }
+
+  playAgainBtn.addEventListener("click", function () {
+    state.scores = state.players.map(function () { return 0; });
+    state.history = [];
+    state.round = 1;
+    state.status = "playing";
+    saveState();
+    showScreen("game");
+    renderScoreboard();
+    undoBtn.disabled = true;
+    undoSnapshot = null;
+    beginRound(true);
+  });
+
+  newGameBtn.addEventListener("click", function () {
+    clearState();
+    resetToSetup();
+  });
+
+  // ---------- Screen management ----------
+  function showScreen(name) {
+    Object.keys(screens).forEach(function (k) {
+      screens[k].classList.toggle("active", k === name);
+    });
+  }
+
+  function resetToSetup() {
+    state = { videoId: null, players: [], scores: [], pointsToWin: 10, history: [], round: 1, soundOn: true, status: "setup" };
+    if (ytPlayer) { try { ytPlayer.destroy(); } catch (e) {} ytPlayer = null; }
+    duration = 0;
+    playerRows.innerHTML = "";
+    addPlayerRow(""); addPlayerRow("");
+    pointsToWinInput.value = 10;
+    videoUrlInput.value = "https://youtu.be/5VGsMlLTJM4";
+    startBtn.disabled = false;
+    showScreen("setup");
+  }
+
+  // ---------- Start game ----------
+  startBtn.addEventListener("click", function () {
+    var vid = extractVideoId(videoUrlInput.value);
+    if (!vid) {
+      showVideoError("Couldn't find a valid YouTube video ID in that link. Paste the full URL or the 11-character video ID.");
+      return;
+    }
+    var names = getSetupPlayerNames();
+    if (names.length < 2) { showVideoError("Add at least 2 players."); return; }
+    var pointsToWin = parseInt(pointsToWinInput.value, 10);
+    if (!pointsToWin || pointsToWin < 1) pointsToWin = 10;
+
+    videoError.classList.remove("show");
+    startBtn.disabled = true;
+
+    state.videoId = vid;
+    state.players = names;
+    state.scores = names.map(function () { return 0; });
+    state.pointsToWin = pointsToWin;
+    state.history = [];
+    state.round = 1;
+    state.soundOn = true;
+    state.status = "playing";
+    saveState();
+
+    renderScoreboard();
+    updateSoundToggleUI();
+    showScreen("game");
+    duration = 0;
+    createPlayer(vid);
+  });
+
+  // ---------- Boot / resume ----------
+  function boot() {
+    var saved = loadState();
+    if (saved && saved.status === "playing" && saved.videoId && saved.players && saved.players.length) {
+      state = saved;
+      renderScoreboard();
+      updateSoundToggleUI();
+      roundCounterEl.textContent = "Segment " + state.round;
+      showScreen("game");
+      createPlayer(state.videoId);
+    } else {
+      addPlayerRow("");
+      addPlayerRow("");
+      showScreen("setup");
+    }
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
