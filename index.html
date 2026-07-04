@@ -604,7 +604,8 @@
     state.scores[i] += 1;
     roundActive = false;
     setScoreboardEnabled(false);
-    revealBtn.disabled = true;
+    // Reveal Sound stays enabled after a point — the scorekeeper may still want
+    // to unmute and hear the rest of the segment before moving on.
     skipBtn.disabled = true;
     playPointSound();
 
