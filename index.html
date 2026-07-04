@@ -84,8 +84,11 @@
   }
   #yt-player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
   .shield {
+    /* Deliberately non-interactive: YouTube occasionally serves ads on embeds,
+       and a click-blocking overlay would trap players behind an unskippable ad.
+       Clicks pass straight through to the player so "Skip Ad" stays usable. */
     position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 5;
-    background: transparent; cursor: default;
+    background: transparent; pointer-events: none;
   }
   .status-pill {
     position: absolute; top: 10px; right: 10px; z-index: 6;
@@ -433,6 +436,7 @@
   function createPlayer(videoId) {
     if (!ytApiReady) { pendingVideoId = videoId; return; }
     if (ytPlayer) { ytPlayer.destroy(); ytPlayer = null; }
+    stopCaptionWatch();
     ytPlayer = new YT.Player("yt-player", {
       videoId: videoId,
       playerVars: {
@@ -458,13 +462,23 @@
   }
 
   // Some viewers have YouTube captions turned on at the account/browser level,
-  // which overrides the cc_load_policy:0 embed param. The only reliable fix is
-  // to actively unload the captions module through the player API — and redo it
-  // whenever the API reports a module change (YouTube can silently reload the
-  // captions module on seek/play).
+  // which overrides the cc_load_policy:0 embed param. cc_load_policy and a
+  // single unloadModule() call aren't reliable enough on their own — YouTube
+  // can silently reload the captions module on seek, on state changes, or on
+  // a delay. So on top of unloadModule on every event we care about, run a
+  // recurring poll for as long as the player is alive that keeps stripping it.
+  var captionWatchTimer = null;
   function killCaptions() {
     if (!ytPlayer || typeof ytPlayer.unloadModule !== "function") return;
     try { ytPlayer.unloadModule("captions"); } catch (e) { /* ignore */ }
+    try { ytPlayer.setOption("captions", "track", {}); } catch (e) { /* ignore */ }
+  }
+  function startCaptionWatch() {
+    stopCaptionWatch();
+    captionWatchTimer = setInterval(killCaptions, 1000);
+  }
+  function stopCaptionWatch() {
+    if (captionWatchTimer) { clearInterval(captionWatchTimer); captionWatchTimer = null; }
   }
   function onPlayerApiChange() {
     killCaptions();
@@ -475,6 +489,7 @@
     duration = ytPlayer.getDuration() || 0;
     videoError.classList.remove("show");
     killCaptions();
+    startCaptionWatch();
     beginRound(true);
   }
 
@@ -486,10 +501,22 @@
   }
 
   function onPlayerStateChange(e) {
+    killCaptions();
     // 0 = ended: the random seek landed too close to the end of the video for
     // playback to continue a full round. Just pick a new time and keep going.
     if (e.data === 0 && state.status === "playing") {
       beginRound(false);
+      return;
+    }
+    // 2 = paused. The click-through shield (needed so YouTube's "Skip Ad"
+    // button stays usable) means a stray click on the video itself can pause
+    // it. If we're mid-round and not intentionally paused, resume playback.
+    if (e.data === 2 && state.status === "playing" && roundActive) {
+      setTimeout(function () {
+        if (ytPlayer && state.status === "playing" && roundActive) {
+          ytPlayer.playVideo();
+        }
+      }, 250);
     }
   }
 
@@ -674,6 +701,7 @@
 
   function resetToSetup() {
     state = { videoId: null, players: [], scores: [], pointsToWin: 10, history: [], round: 1, soundOn: true, status: "setup" };
+    stopCaptionWatch();
     if (ytPlayer) { try { ytPlayer.destroy(); } catch (e) {} ytPlayer = null; }
     duration = 0;
     playerRows.innerHTML = "";
