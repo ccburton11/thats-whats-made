@@ -31,7 +31,8 @@ you've already seen.
 - One shared screen, no backend &mdash; pure static site (`index.html`) using
   the YouTube IFrame Player API. Refreshing the page resumes the game in
   progress.
-- Clips are streamed live from YouTube; nothing is downloaded or re-hosted.
+- Clips are streamed live from
+- YouTube; nothing is downloaded or re-hosted.
   All video content belongs to the Science Channel and *How It's Made*.
 - Because the YouTube IFrame API requires HTTPS, this only works when served
   over a real web server (e.g. GitHub Pages) &mdash; not by opening
